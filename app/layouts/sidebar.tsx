@@ -1,19 +1,38 @@
-import { Form, Link, Outlet } from "react-router";
-import { getContacts } from "../data";
+import {
+  Form,
+  Link,
+  NavLink,
+  Outlet,
+  useNavigation,
+  useSubmit,
+} from "react-router";
+import { createEmptyContact, getContacts } from "../data";
 import type { Route } from "./+types/sidebar";
+import { useEffect } from "react";
 
 /* export async function clientLoader() {
   const contacts = await getContacts();
   return { contacts };
 } */
 
-export async function loader() {
-  const contacts = await getContacts();
-  return { contacts };
+export async function loader({ request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q");
+  const contacts = await getContacts(q);
+  return { contacts, q };
 }
 
 export default function SidebarLayout({ loaderData }: Route.ComponentProps) {
-  const { contacts } = loaderData;
+  const { contacts, q } = loaderData;
+  const navigation = useNavigation();
+  const submit = useSubmit();
+
+  useEffect(() => {
+    const searchField = document.getElementById("q");
+    if (searchField instanceof HTMLInputElement) {
+      searchField.value = q || "";
+    }
+  }, [q]);
 
   return (
     <>
@@ -22,9 +41,14 @@ export default function SidebarLayout({ loaderData }: Route.ComponentProps) {
           <Link to="about">React Router Contacts</Link>
         </h1>
         <div>
-          <Form id="search-form" role="search">
+          <Form
+            id="search-form"
+            onChange={(event) => submit(event.currentTarget)}
+            role="search"
+          >
             <input
               aria-label="Search contacts"
+              defaultValue={q || ""}
               id="q"
               name="q"
               placeholder="Search"
@@ -41,7 +65,12 @@ export default function SidebarLayout({ loaderData }: Route.ComponentProps) {
             <ul>
               {contacts.map((contact) => (
                 <li key={contact.id}>
-                  <Link to={`contacts/${contact.id}`}>
+                  <NavLink
+                    className={({ isActive, isPending }) =>
+                      isActive ? "active" : isPending ? "pending" : ""
+                    }
+                    to={`contacts/${contact.id}`}
+                  >
                     {contact.first || contact.last ? (
                       <>
                         {contact.first} {contact.last}
@@ -50,7 +79,7 @@ export default function SidebarLayout({ loaderData }: Route.ComponentProps) {
                       <i>No Name</i>
                     )}
                     {contact.favorite ? <span>★</span> : null}
-                  </Link>
+                  </NavLink>
                 </li>
               ))}
             </ul>
@@ -61,7 +90,10 @@ export default function SidebarLayout({ loaderData }: Route.ComponentProps) {
           )}
         </nav>
       </div>
-      <div id="detail">
+      <div
+        id="detail"
+        className={navigation.state === "loading" ? "loading" : ""}
+      >
         <Outlet />
       </div>
     </>
